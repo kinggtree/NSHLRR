@@ -1,0 +1,40 @@
+def compute_laplacian(Y, k):
+    # 计算k近邻图
+    nbrs = NearestNeighbors(n_neighbors=k, algorithm='ball_tree').fit(Y.T)
+    distances, indices = nbrs.kneighbors(Y.T)
+
+    # 计算高斯核函数的带宽
+    distances = pdist(Y.T, 'euclidean')
+    sigma = np.median(distances)
+
+    # 创建加权邻接矩阵
+    n = Y.shape[1]
+    W = np.zeros((n, n))
+    for i in range(n):
+        for j in indices[i]:
+            W[i, j] = np.exp(-np.linalg.norm(Y[:, i] - Y[:, j])**2 / (2. * sigma**2))
+
+    # 计算度矩阵
+    D = np.diag(W.sum(axis=0))
+
+    # 我们需要先定义超边，这里我们假设每个数据点和它的k个最近邻构成一个超边
+    hyperedges = indices
+
+    # 计算关联矩阵H
+    H = np.zeros((n, n))
+    for i in range(n):
+        H[i, hyperedges[i]] = 1
+
+    # 计算每个顶点的度D_v
+    D_v = np.diag(H.sum(axis=1))
+
+    # 计算每个超边的度D_e
+    D_e = np.diag(H.sum(axis=0))
+
+    # 计算超边的权重矩阵W_e，这里我们假设每个超边的权重为其包含的点的权重的平均值
+    W_e = np.diag([W[i, hyperedges[i]].mean() for i in range(n)])
+
+    # 计算超图拉普拉斯矩阵Lh
+    Lh = D_v - H @ np.linalg.inv(D_e) @ W_e @ H.T
+
+    return Lh
